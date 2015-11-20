@@ -60,7 +60,7 @@ class FuzzyCMeans(
     val norms = data.map(v => breezeNorm(v.toBreeze, 2.0))
     norms.persist()
     val breezeData = data.map(_.toBreeze).zip(norms).map { case (v, norm) =>
-      new BreezeVectorWithNorm(v, norm)
+      new VectorWithNorm(v, norm)
     }
     val model = runBreeze(breezeData)
     //val mode = null
@@ -78,8 +78,8 @@ class FuzzyCMeans(
     println("updating matrix!!!")
   }
 
-  override def initCenters(data: RDD[BreezeVectorWithNorm]) :
-  Array[Array[BreezeVectorWithNorm]] = {
+  override def initCenters(data: RDD[VectorWithNorm]) :
+  Array[Array[VectorWithNorm]] = {
 
     //init the membership matrix with random floats
     var dataArr = data.collect()(0).getDataVector()
@@ -101,7 +101,7 @@ class FuzzyCMeans(
    * this method updates the centers according to the following formula
    * c_i = (SUM_i(u_i_j * x_i) ) / (SUM_i (u_i_j) )
    */
-  override def calculateCenters(data: RDD[BreezeVectorWithNorm]) : KMeansModel  = {
+  override def calculateCenters(data: RDD[VectorWithNorm]) : KMeansModel  = {
     //super.calculateCenters(data)
     val sc = data.sparkContext
     val active = Array.fill(runs)(true)
@@ -115,7 +115,7 @@ class FuzzyCMeans(
     // Execute Dunn & Bezdek algorithm from Fuzzy clustering
     var notConverged :Boolean = true
 
-    //var dataArr: Array[BreezeVectorWithNorm] = data.toArray()
+    //var dataArr: Array[VectorWithNorm] = data.toArray()
     var dataArr = data.collect()(0).getDataVector()
     //dataArr(0).getDataVector()
 
@@ -126,7 +126,7 @@ class FuzzyCMeans(
       //data.mapPartitions{ points =>
 
       //get the data array:
-      //var dataArr: Array[BreezeVectorWithNorm] = data.toArray()
+      //var dataArr: Array[VectorWithNorm] = data.toArray()
 
       // new center calculation:
       // c_j = (SUM_i(u_i_j * x_i) ) / (SUM_i (u_i_j) )
@@ -151,15 +151,15 @@ class FuzzyCMeans(
         var totalArr = new Array[Double](0)
         totalArr(0) = total
 
-        val newCenter = new BreezeVectorWithNorm(totalArr)
+        val newCenter = new VectorWithNorm(totalArr)
 //        var count = 10
 //        var sum : Double = 5
 //        sum /= count.toDouble
 //        var vec : BV[Double]
 //        vec(0) = sum
-//        val newCenter2 = new BreezeVectorWithNorm(vec)
+//        val newCenter2 = new VectorWithNorm(vec)
 
-        //val newCenter = new BreezeVectorWithNorm(total)
+        //val newCenter = new VectorWithNorm(total)
         //var newCenter = totalSum / columnSum
 
         // update the center array:
