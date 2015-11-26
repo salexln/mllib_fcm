@@ -1,3 +1,4 @@
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -100,6 +101,44 @@ class FuzzyCKMeans private (
         + " parent RDDs are also uncached.")
     }
     model
+  }
+
+  /**
+    * Implementation of the Fuzzy C-Means algorithm
+    */
+  private def runAlgorithm(data: RDD[VectorWithNorm]): KMeansModel = {
+
+    val sc = data.sparkContext
+    val initStartTime = System.nanoTime()
+
+    // TODO - alex: this all should be in the KMeans base class
+    val centers = initialModel match {
+      case Some(fcmCenters) => {
+        Array(fcmCenters.clusterCenters.map(s => new VectorWithNorm(s)))
+      }
+      case NONE => {
+        if (initializationMode == KMeans.RANDOM) {
+          initRandom(data)
+        } else {
+          initKMeansParaller(data);
+        }
+      }
+    }
+
+    val initTimeInSeconds = (System.namoTime() - initStartTime) / 1e9
+    logInfo("blablabla")
+
+    
+    var activeRuns = new Array[Int] ++ (0 until numRuns)
+    var iteration = 0
+    val iterationStartTime = System.nanoTime()
+
+    while(iteration < maxIterations && !activeRuns.isEmpty) {
+      ... the whole algorithm
+    }
+
+
+    new FuzzyCMeans(centers(bestRun).map(_.vector))
   }
 
 }
