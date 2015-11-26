@@ -15,8 +15,13 @@
  * limitations under the License.
  */
 
-import org.apache.spark.Logging
+package org.apache.spark.mllib.clustering
 
+import org.apache.spark.Logging
+// import org.apache.spark.mllib.clustering.KMeansModel
+import org.apache.spark.mllib.linalg.{Vectors, Vector}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 
 
 class FuzzyCKMeans private (
@@ -73,7 +78,29 @@ class FuzzyCKMeans private (
     this
   }
 
+  def run(data: RDD[Vector]): FuzzyCMeansModel = {
 
+    if (data.getStorageLevel == StorageLevel.NONE) {
+      logWarning("The input data is not directly cached, which may hurt performance if its"
+        + " parent RDDs are also uncached.")
+    }
+
+    // Compute squared norms and cache them.
+    val norms = data.map(Vectors.norm(_, 2.0))
+    norms.persist()
+    val zippedData = data.zip(norms).map { case (v, norm) =>
+      new VectorWithNorm(v, norm)
+    }
+    val model = runAlgorithm(zippedData)
+    norms.unpersist()
+
+    // Warn at the end of the run as well, for increased visibility.
+    if (data.getStorageLevel == StorageLevel.NONE) {
+      logWarning("The input data was not directly cached, which may hurt performance if its"
+        + " parent RDDs are also uncached.")
+    }
+    model
+  }
 
 }
 
