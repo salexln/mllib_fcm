@@ -121,7 +121,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     val initStartTime = System.nanoTime()
 
     val numRuns = runs
-    val centers = initRandom(data)
+    val centers = initRandomCenters(data)
 
     // TODO - alex: this all should be in the KMeans base class
 //    val centers = initialModel match {
@@ -144,16 +144,25 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     var activeRuns = new ArrayBuffer[Int] ++ (0 until numRuns)
     var iteration = 0
     val iterationStartTime = System.nanoTime()
+    var converged = false
 
-    while(iteration < maxIterations && !activeRuns.isEmpty) {
-      // ... the whole algorithm
+    // Implementation of Fuzzy C-Means algorithm:
+    while(iteration < maxIterations && !activeRuns.isEmpty && converged == false) {
+
+      // broadcast the centers to all the machines
+      val broadces_centers = sc.broadcast(centers);
+
+      // Calculate centers:
+
+      // Update:
+
     }
 
     val bestRun = 1;
     new FuzzyCMeansModel(centers(bestRun).map(_.vector))
   }
 
-  private def initRandom(data: RDD[VectorWithNorm])
+  private def initRandomCenters(data: RDD[VectorWithNorm])
   : Array[Array[VectorWithNorm]] = {
     // Sample all the cluster centers in one pass to avoid repeated scans
 
