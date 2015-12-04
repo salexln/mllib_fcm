@@ -157,20 +157,23 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
 
       // broadcast the centers to all the machines
-      val broadces_centers = sc.broadcast(centers);
+      val broadcasted_centers = sc.broadcast(centers)
+
+//      val temp = broadcasted_centers.value(0)
+//      val temp = new Vector(1, 2, 3)
+//      val newCenter = new VectorWithNorm(temp)
 
       /**
       * Recalculate the centroid of each cluster using:
       *             FOR j = 0: j < clustersNum:
       *                 c_j = (SUM_i (u_i_j * x_i) ) / (SUM_i(u_i_j))
       */
-      val total = data.mapPartitionsInternal { data_ponts =>
-
-//        /**
-//        * An array thet represemts the distance the data_point (x_i) from from each cluster
-//        * cluster_to_point_distance[j] = ||x_i - c_j ||
-//        */
-//        val cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
+      val totContr = data.mapPartitions { data_ponts =>
+        //        /**
+        //        * An array thet represemts the distance the data_point (x_i) from from each cluster
+        //        * cluster_to_point_distance[j] = ||x_i - c_j ||
+        //        */
+        //        val cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
 
         /**
         * An array thet represemts the distance the data_point (x_i) from from each cluster
@@ -178,45 +181,88 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
         */
         val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
 
-
         val partial_num = Array.fill(clustersNum)(0)
         val partialDen = Array.fill[Double](clustersNum)(0)
         data_ponts.foreach { data_point =>
-
           /**
-          * total_distance reprecents for each data_point the total distance from clusters:
+          * total_distance represents for each data_point the total distance from clusters:
           *
-          *      total_distance = SUM_j 1 / ( (||data_point - c_j||) ^ (2/ (m-1) ) )
+          *      total_distance = SUM_j 1 / ( (||data_point - c_j||)^(2/ (m-1) ) )
           */
           val total_distance = 0.0
-
           // computation of the distance of data_point from each cluster:
           for (j <- 0 until clustersNum) {
-//            cluster_to_point_distance(j) = KMeans.fastSquaredDistance(data_point, broadces_centers(j))
+            // cluster_to_point_distance(j) = KMeans.fastSquaredDistance(data_point, broadces_centers(j))
             // the distance of data_point from cluster j:
-            val cluster_to_point_distance = KMeans.fastSquaredDistance(data_point, broadces_centers(j))
+
+            // Alex: is this corrent???
+            val cluster_to_point_distance = KMeans.fastSquaredDistance(broadcasted_centers.value(j)(0) , data_point)
             actual_cluster_to_point_distance(j) = math.pow(cluster_to_point_distance, (2/( fuzzynessCoefficient - 1)))
 
             // update the total_distance:
             total_distance += (1 / actual_cluster_to_point_distance(j))
           }
-
-          // calculation of the new values of the membership matrix:
-          for (j <- 0 until clustersNum) {
-
-            /**
-            * u_i_j = 1 / ( SUM_k( (||x_i - c_j|| / ||x_i - c_K||) ^ (x/(m - 1))) )
-            * this is the calculation of (u_ij)^m:
-            */
-            // Alex: need to understand this better!!!
-            val u_i_j_m = math.pow(actual_cluster_to_point_distance(j) * total_distance, -fuzzynessCoefficient)
-
-            partial_num(j) += (data_point.vector * u_i_j_m) // local num of c(j) formula
-
-            partialDen(j) += u_i_j_m // local den of c(j) formula
-          }
         }
-      }.reduceByKey((x, y) = > (x._1 + y._1, x._2 + y.+2)).collectAsMap()
+
+        val contribs = for (i <- 0 until runs; j <- 0 until clustersNum) yield {
+          (i, j)
+        }
+        contribs.iterator
+      }.reduceByKey(_ + _).collectAsMap()
+
+
+//      val total = data.mapPartitions { data_ponts =>
+////        /**
+////        * An array thet represemts the distance the data_point (x_i) from from each cluster
+////        * cluster_to_point_distance[j] = ||x_i - c_j ||
+////        */
+////        val cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
+//
+//        /**
+//        * An array thet represemts the distance the data_point (x_i) from from each cluster
+//        * actual_cluster_to_point_distance [j] = (||x_i - c_j ||) ^ (2/(m-1))
+//        */
+//        val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
+//
+//
+//        val partial_num = Array.fill(clustersNum)(0)
+//        val partialDen = Array.fill[Double](clustersNum)(0)
+//        data_ponts.foreach { data_point =>
+//
+//          /**
+//          * total_distance reprecents for each data_point the total distance from clusters:
+//          *
+//          *      total_distance = SUM_j 1 / ( (||data_point - c_j||) ^ (2/ (m-1) ) )
+//          */
+//          val total_distance = 0.0
+//
+//          // computation of the distance of data_point from each cluster:
+//          for (j <- 0 until clustersNum) {
+////            cluster_to_point_distance(j) = KMeans.fastSquaredDistance(data_point, broadces_centers(j))
+//            // the distance of data_point from cluster j:
+//            val cluster_to_point_distance = KMeans.fastSquaredDistance(data_point, broadcasted_centers.value(j))
+//            actual_cluster_to_point_distance(j) = math.pow(cluster_to_point_distance, (2/( fuzzynessCoefficient - 1)))
+//
+//            // update the total_distance:
+//            total_distance += (1 / actual_cluster_to_point_distance(j))
+//          }
+//
+//          // calculation of the new values of the membership matrix:
+//          for (j <- 0 until clustersNum) {
+//
+//            /**
+//            * u_i_j = 1 / ( SUM_k( (||x_i - c_j|| / ||x_i - c_K||) ^ (x/(m - 1))) )
+//            * this is the calculation of (u_ij)^m:
+//            */
+//            // Alex: need to understand this better!!!
+//            val u_i_j_m = math.pow(actual_cluster_to_point_distance(j) * total_distance, -fuzzynessCoefficient)
+//
+//            partial_num(j) += (data_point.vector * u_i_j_m) // local num of c(j) formula
+//
+//            partialDen(j) += u_i_j_m // local den of c(j) formula
+//          }
+//        }
+//      }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap().collectAsMap
 
      // Update:
 
