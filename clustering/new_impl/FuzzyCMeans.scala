@@ -234,66 +234,39 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
       }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap()
 
 
-
-
-//      val total = data.mapPartitions { data_ponts =>
-////        /**
-////        * An array thet represemts the distance the data_point (x_i) from from each cluster
-////        * cluster_to_point_distance[j] = ||x_i - c_j ||
-////        */
-////        val cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
-//
-//        /**
-//        * An array thet represemts the distance the data_point (x_i) from from each cluster
-//        * actual_cluster_to_point_distance [j] = (||x_i - c_j ||) ^ (2/(m-1))
-//        */
-//        val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
-//
-//
-//        val partial_num = Array.fill(clustersNum)(0)
-//        val partialDen = Array.fill[Double](clustersNum)(0)
-//        data_ponts.foreach { data_point =>
-//
-//          /**
-//          * total_distance reprecents for each data_point the total distance from clusters:
-//          *
-//          *      total_distance = SUM_j 1 / ( (||data_point - c_j||) ^ (2/ (m-1) ) )
-//          */
-//          val total_distance = 0.0
-//
-//          // computation of the distance of data_point from each cluster:
-//          for (j <- 0 until clustersNum) {
-////            cluster_to_point_distance(j) = KMeans.fastSquaredDistance(data_point, broadces_centers(j))
-//            // the distance of data_point from cluster j:
-//            val cluster_to_point_distance = KMeans.fastSquaredDistance(data_point, broadcasted_centers.value(j))
-//            actual_cluster_to_point_distance(j) = math.pow(cluster_to_point_distance, (2/( fuzzynessCoefficient - 1)))
-//
-//            // update the total_distance:
-//            total_distance += (1 / actual_cluster_to_point_distance(j))
-//          }
-//
-//          // calculation of the new values of the membership matrix:
-//          for (j <- 0 until clustersNum) {
-//
-//            /**
-//            * u_i_j = 1 / ( SUM_k( (||x_i - c_j|| / ||x_i - c_K||) ^ (x/(m - 1))) )
-//            * this is the calculation of (u_ij)^m:
-//            */
-//            // Alex: need to understand this better!!!
-//            val u_i_j_m = math.pow(actual_cluster_to_point_distance(j) * total_distance, -fuzzynessCoefficient)
-//
-//            partial_num(j) += (data_point.vector * u_i_j_m) // local num of c(j) formula
-//
-//            partialDen(j) += u_i_j_m // local den of c(j) formula
-//          }
+     // Update centers:
+      var center_chaned = false
+//      for (j <- 0 until clustersNum) {
+//        if (totContr(j)._2 != 0) {
+//          // create a new center:
+////          var new_center = new VectorWithNorm((totContr(j)._1 / totContr(j)._2), 2)
+//          var temp = new VectorWithNorm(totContr(j)._1 / totContr(j)._2)
+//          center_chaned = true
 //        }
-//      }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap().collectAsMap
+//      }
 
-     // Update:
+
+      if(center_chaned == false) {
+        // this means that no change was made the we can stop
+        converged = true
+        logInfo("Run finished in " + (iteration + 1) + " iterations")
+      } else {
+        iteration += 1
+      }
 
     }
 
-    val bestRun = 1;
+    val iterationTimeInSeconds = (System.nanoTime() - iterationStartTime) / 1e9
+    logInfo(s"Iterations took " + "%.3f".format(iterationTimeInSeconds) + " seconds.")
+
+    if (iteration == maxIterations) {
+      logInfo(s"Fuzzy C-Means reached the max number of iterations: $maxIterations.")
+    } else {
+      logInfo(s"Fuzzy C-Means converged in $iteration iterations.")
+    }
+
+    // Alex: we do not need this!!!
+    val bestRun = 1
     new FuzzyCMeansModel(centers(bestRun).map(_.vector))
   }
 
@@ -308,4 +281,21 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     }.toArray)
   }
 
+}
+
+
+object FuzzyCMeans {
+
+  def train(
+      data: RDD[Vector],
+      clusterNum: Int,
+      fuzzynessCoefficient: Double,
+      maxIterations: Int,
+      epsilon: Double): FuzzyCMeansModel = {
+    new FuzzyCKMeans().setClustersNum(clusterNum)
+      .setFuzzynessCoefficient(fuzzynessCoefficient)
+      .setMaxIterations(maxIterations)
+      .setEplison(epsilon)
+      .run(data)
+  }
 }
