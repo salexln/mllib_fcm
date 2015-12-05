@@ -181,7 +181,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
         */
         val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
 
-        val partial_num = Array.fill(clustersNum)(0)
+        val partial_num = Array.fill[Double](clustersNum)(0)
         val partialDen = Array.fill[Double](clustersNum)(0)
         data_ponts.foreach { data_point =>
           /**
@@ -189,7 +189,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
           *
           *      total_distance = SUM_j 1 / ( (||data_point - c_j||)^(2/ (m-1) ) )
           */
-          val total_distance = 0.0
+          var total_distance = 0.0
           // computation of the distance of data_point from each cluster:
           for (j <- 0 until clustersNum) {
             // cluster_to_point_distance(j) = KMeans.fastSquaredDistance(data_point, broadces_centers(j))
@@ -201,6 +201,21 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
             // update the total_distance:
             total_distance += (1 / actual_cluster_to_point_distance(j))
+          }
+
+          // calculation of the new values of the membership matrix:
+          for (j <- 0 until clustersNum) {
+
+            /**
+            * u_i_j = 1 / ( SUM_k( (||x_i - c_j|| / ||x_i - c_K||) ^ (x/(m - 1))) )
+            * this is the calculation of (u_ij)^m:
+            */
+            // Alex: need to understand this better!!!
+            val u_i_j_m = math.pow(actual_cluster_to_point_distance(j) * total_distance, -fuzzynessCoefficient)
+
+            partial_num(j) += (data_point.vector(0) * u_i_j_m) // local num of c(j) formula
+
+            partialDen(j) += u_i_j_m // local den of c(j) formula
           }
         }
 
