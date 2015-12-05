@@ -19,6 +19,7 @@
 package org.apache.spark.mllib.clustering
 
 import org.apache.spark.Logging
+import org.apache.spark.mllib.linalg.BLAS._
 import org.apache.spark.util.random.XORShiftRandom
 
 // import org.apache.spark.mllib.clustering.KMeansModel
@@ -26,6 +27,7 @@ import org.apache.spark.mllib.linalg.{Vectors, Vector}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import scala.collection.mutable.ArrayBuffer
+
 
 
 class FuzzyCKMeans private ( private var clustersNum: Int,
@@ -154,6 +156,11 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
     // Implementation of Fuzzy C-Means algorithm:
     while(iteration < maxIterations && !activeRuns.isEmpty && converged == false) {
+      type WeightedPoint = (Vector, Long)
+      def mergeContribs(x: WeightedPoint, y: WeightedPoint): WeightedPoint = {
+        axpy(1.0, x._1, y._1)
+        (y._1, x._2 + y._2)
+      }
 
 
       // broadcast the centers to all the machines
@@ -219,11 +226,14 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
           }
         }
 
-        val contribs = for (i <- 0 until runs; j <- 0 until clustersNum) yield {
-          (i, j)
+        val centerContribs = for (j <- 0 until clustersNum) yield {
+          (j, (partial_num(j), partialDen(j)))
         }
-        contribs.iterator
-      }.reduceByKey(_ + _).collectAsMap()
+        centerContribs.iterator
+
+      }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap()
+
+
 
 
 //      val total = data.mapPartitions { data_ponts =>
