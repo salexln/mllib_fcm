@@ -114,25 +114,6 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     model
   }
 
-  /**
-    * Implementation of the Fuzzy C-Means algorithm
-    *
-    * Fuzzy C Means algorithm psuedo - code:
-    * (taken from
-    *  - http://upetd.up.ac.za/thesis/available/etd-10172011-211435/unrestricted/01chapters1-2.pdf)
-    *  - http://home.deib.polimi.it/matteucc/Clustering/tutorial_html/cmeans.html
-    *
-    * 1. Randomly initialize C clusters
-    * 2. Initialize membership matrix
-    * 3. Repeat
-    *  3.1 Recalculate the centroid of each cluster using:
-    *      c_j = (SUM_i (u_i_j * x_i) ) / (SUM_i(u_i_j))
-    *  3.2 Update the membership matrix U with U' using:
-    *      u_i_j = 1 / (SUM_k ( ( ||x_i - c_j||)/ (||x_i - c_k||) ) pow (2/(m-1)))
-    *  3.3 Until
-    *      MAX_i_k{ ||u_i_k  - u'_i_k || } < epsilon
-
-    */
   private def runAlgorithm(data: RDD[VectorWithNorm]): FuzzyCMeansModel = {
 
     val sc = data.sparkContext
@@ -156,11 +137,11 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
     // Implementation of Fuzzy C-Means algorithm:
     while(iteration < maxIterations && !activeRuns.isEmpty && converged == false) {
-      type WeightedPoint = (Vector, Long)
-      def mergeContribs(x: WeightedPoint, y: WeightedPoint): WeightedPoint = {
-        axpy(1.0, x._1, y._1)
-        (y._1, x._2 + y._2)
-      }
+//      type WeightedPoint = (Vector, Long)
+//      def mergeContribs(x: WeightedPoint, y: WeightedPoint): WeightedPoint = {
+//        axpy(1.0, x._1, y._1)
+//        (y._1, x._2 + y._2)
+//      }
 
 
       // broadcast the centers to all the machines
@@ -217,7 +198,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
             * u_i_j = 1 / ( SUM_k( (||x_i - c_j|| / ||x_i - c_K||) ^ (x/(m - 1))) )
             * this is the calculation of (u_ij)^m:
             */
-            // Alex: need to understand this better!!!
+
             val u_i_j_m = math.pow(actual_cluster_to_point_distance(j) * total_distance, -fuzzynessCoefficient)
 
             partial_num(j) += (data_point.vector(0) * u_i_j_m) // local num of c(j) formula
@@ -227,23 +208,30 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
         }
 
         val centerContribs = for (j <- 0 until clustersNum) yield {
-          (j, (partial_num(j), partialDen(j)))
+          val new_center = partial_num(j) / partialDen(j)
+//          (j, (partial_num(j), partialDen(j)))
+          (j, new_center)
         }
         centerContribs.iterator
-
-      }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap()
+      }.collectAsMap()
+//      }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap()
 
 
      // Update centers:
       var center_chaned = false
-//      for (j <- 0 until clustersNum) {
+      for (j <- 0 until clustersNum) {
+        // create new center:
+        // new VectorWithNorm(Vectors.dense(v.vector.toArray), v.norm)
+        var new_center = new VectorWithNorm((Vectors.dense(totContr(j).toArray)))
+
 //        if (totContr(j)._2 != 0) {
-//          // create a new center:
-////          var new_center = new VectorWithNorm((totContr(j)._1 / totContr(j)._2), 2)
+          // create a new center:
+//          var new_center = new VectorWithNorm((totContr(j)._1 / totContr(j)._2), 2)
 //          var temp = new VectorWithNorm(totContr(j)._1 / totContr(j)._2)
+//          val temp = new Array[VectorWithNorm]F
 //          center_chaned = true
 //        }
-//      }
+      }
 
 
       if(center_chaned == false) {
