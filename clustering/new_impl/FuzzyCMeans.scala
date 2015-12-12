@@ -208,29 +208,32 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
         }
 
         val centerContribs = for (j <- 0 until clustersNum) yield {
-          val new_center = partial_num(j) / partialDen(j)
-//          (j, (partial_num(j), partialDen(j)))
-          (j, new_center)
+          (j, (partial_num(j), partialDen(j)))
         }
         centerContribs.iterator
-      }.collectAsMap()
-//      }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap()
+
+//      }.collectAsMap()
+      }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap()
+
 
 
      // Update centers:
       var center_chaned = false
       for (j <- 0 until clustersNum) {
         // create new center:
-        // new VectorWithNorm(Vectors.dense(v.vector.toArray), v.norm)
-        var new_center = new VectorWithNorm((Vectors.dense(totContr(j).toArray)))
 
-//        if (totContr(j)._2 != 0) {
-          // create a new center:
+//        var new_center = new VectorWithNorm(Vectors.dense(v.vector.toArray), v.norm)
+//        var new_center = new VectorWithNorm((Vectors.dense(totContr(j).toArray)))
+
+        if (totContr(j)._2 != 0) {
+           // create a new center:
+          var arr = new Array[Double](8)  // Alex - need to create new center correctly
+          var new_center = new VectorWithNorm(arr)
 //          var new_center = new VectorWithNorm((totContr(j)._1 / totContr(j)._2), 2)
 //          var temp = new VectorWithNorm(totContr(j)._1 / totContr(j)._2)
 //          val temp = new Array[VectorWithNorm]F
-//          center_chaned = true
-//        }
+          center_chaned = true
+        }
       }
 
 
