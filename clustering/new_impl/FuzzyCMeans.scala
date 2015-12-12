@@ -137,19 +137,9 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
     // Implementation of Fuzzy C-Means algorithm:
     while(iteration < maxIterations && !activeRuns.isEmpty && converged == false) {
-//      type WeightedPoint = (Vector, Long)
-//      def mergeContribs(x: WeightedPoint, y: WeightedPoint): WeightedPoint = {
-//        axpy(1.0, x._1, y._1)
-//        (y._1, x._2 + y._2)
-//      }
-
 
       // broadcast the centers to all the machines
       val broadcasted_centers = sc.broadcast(centers)
-
-//      val temp = broadcasted_centers.value(0)
-//      val temp = new Vector(1, 2, 3)
-//      val newCenter = new VectorWithNorm(temp)
 
       /**
       * Recalculate the centroid of each cluster using:
@@ -157,11 +147,10 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
       *                 c_j = (SUM_i (u_i_j * x_i) ) / (SUM_i(u_i_j))
       */
       val totContr = data.mapPartitions { data_ponts =>
-        //        /**
-        //        * An array thet represemts the distance the data_point (x_i) from from each cluster
-        //        * cluster_to_point_distance[j] = ||x_i - c_j ||
-        //        */
-        //        val cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
+//        /**
+//        * An array thet represemts the distance the data_point (x_i) from from each cluster
+//        * cluster_to_point_distance[j] = ||x_i - c_j ||
+//        */
 
         /**
         * An array thet represemts the distance the data_point (x_i) from from each cluster
@@ -178,14 +167,15 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
           *      total_distance = SUM_j 1 / ( (||data_point - c_j||)^(2/ (m-1) ) )
           */
           var total_distance = 0.0
+
           // computation of the distance of data_point from each cluster:
           for (j <- 0 until clustersNum) {
-            // cluster_to_point_distance(j) = KMeans.fastSquaredDistance(data_point, broadces_centers(j))
             // the distance of data_point from cluster j:
 
             // Alex: is this corrent???
-            val cluster_to_point_distance = KMeans.fastSquaredDistance(broadcasted_centers.value(j)(0) , data_point)
-            actual_cluster_to_point_distance(j) = math.pow(cluster_to_point_distance, (2/( fuzzynessCoefficient - 1)))
+            val cluster_to_point_distance = KMeans.fastSquaredDistance(broadcasted_centers.value(j) , data_point)
+            actual_cluster_to_point_distance(j) = math.pow(cluster_to_point_distance,
+              (2/( fuzzynessCoefficient - 1)))
 
             // update the total_distance:
             total_distance += (1 / actual_cluster_to_point_distance(j))
@@ -218,7 +208,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
 
      // Update centers:
-      var center_chaned = false
+      var center_changed = false
       for (j <- 0 until clustersNum) {
         // create new center:
 
@@ -226,18 +216,18 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 //        var new_center = new VectorWithNorm((Vectors.dense(totContr(j).toArray)))
 
         if (totContr(j)._2 != 0) {
-           // create a new center:
-          var arr = new Array[Double](8)  // Alex - need to create new center correctly
-          var new_center = new VectorWithNorm(arr)
-//          var new_center = new VectorWithNorm((totContr(j)._1 / totContr(j)._2), 2)
-//          var temp = new VectorWithNorm(totContr(j)._1 / totContr(j)._2)
-//          val temp = new Array[VectorWithNorm]F
-          center_chaned = true
+          // create a new center:
+          val newCenter = centers(j)
+
+          if (KMeans.fastSquaredDistance(newCenter, centers(j)) > epsilon * epsilon) {
+            center_changed = true
+          }
+          centers(j) = newCenter
         }
       }
 
 
-      if(center_chaned == false) {
+      if(center_changed == false) {
         // this means that no change was made the we can stop
         converged = true
         logInfo("Run finished in " + (iteration + 1) + " iterations")
@@ -256,20 +246,28 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
       logInfo(s"Fuzzy C-Means converged in $iteration iterations.")
     }
 
-    // Alex: we do not need this!!!
-    val bestRun = 1
-    new FuzzyCMeansModel(centers(bestRun).map(_.vector))
+    // Alex: we do not need this!!
+    new FuzzyCMeansModel(centers.map(_.vector))
   }
 
+//  private def initRandomCenters(data: RDD[VectorWithNorm])
+//  : Array[Array[VectorWithNorm]] = {
+//    // Sample all the cluster centers in one pass to avoid repeated scans
+//
+//    // create a random seed (maybe should be an input like in KMeans??
+//    val sample = data.takeSample(true, runs * clustersNum, new XORShiftRandom().nextInt()).toSeq
+//    Array.tabulate(runs)(r => sample.slice(r * clustersNum, (r + 1) * clustersNum).map { v =>
+//      new VectorWithNorm(Vectors.dense(v.vector.toArray), v.norm)
+//    }.toArray)
+//  }
+
   private def initRandomCenters(data: RDD[VectorWithNorm])
-  : Array[Array[VectorWithNorm]] = {
+  : Array[VectorWithNorm] = {
     // Sample all the cluster centers in one pass to avoid repeated scans
 
     // create a random seed (maybe should be an input like in KMeans??
-    val sample = data.takeSample(true, runs * clustersNum, new XORShiftRandom().nextInt()).toSeq
-    Array.tabulate(runs)(r => sample.slice(r * clustersNum, (r + 1) * clustersNum).map { v =>
-      new VectorWithNorm(Vectors.dense(v.vector.toArray), v.norm)
-    }.toArray)
+    val sample = data.takeSample(true, clustersNum, new XORShiftRandom().nextInt())
+    sample
   }
 
 }
