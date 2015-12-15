@@ -163,7 +163,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
                                                                       .asInstanceOf[BV[Double]])
 //        val actual_cluster_to_point_distance = Array.fill[VectorWithNorm](clustersNum)()
 
-        val partial_num = Array.fill[Double](clustersNum)(0)
+//        val partial_num = Array.fill[Double](clustersNum)(0)
         val partialDen = Array.fill[Double](clustersNum)(0)
         val numDist = Array.fill[Double](clustersNum)(0)
 
@@ -209,7 +209,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
 
         val centerContribs = for (j <- 0 until clustersNum) yield {
-          (j, (partial_num(j), partialDen(j)))
+          (j, (actual_cluster_to_point_distance(j), partialDen(j)))
         }
         centerContribs.iterator
 
@@ -227,10 +227,10 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
         if (totContr(j)._2 != 0) {
           // create a new center:
+          var dense_vec1: BDV[Double] = new BDV(totContr(j)._1.toArray)
+          dense_vec1 /= totContr(j)._2
 
-          var temp: Double = totContr(j)._1 / totContr(j)._2
-          //          val newCenter = new VectorWithNorm(totContr(j)._1 / totContr(j)._2)
-          val newCenter = centers(j)
+          val newCenter = new VectorWithNorm(dense_vec1.toArray)
 
           if (KMeans.fastSquaredDistance(newCenter, centers(j)) > epsilon * epsilon) {
             center_changed = true
