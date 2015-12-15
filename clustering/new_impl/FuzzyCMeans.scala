@@ -18,14 +18,17 @@
 
 package org.apache.spark.mllib.clustering
 
+//import org.apache.spark.mllib.linalg.{ Vector => Alex }
 import org.apache.spark.Logging
 import org.apache.spark.mllib.linalg.BLAS._
 import org.apache.spark.util.random.XORShiftRandom
 
 // import org.apache.spark.mllib.clustering.KMeansModel
-import org.apache.spark.mllib.linalg.{Vectors, Vector}
+import org.apache.spark.mllib.linalg.{DenseVector, Vectors, Vector}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import breeze.linalg.{ DenseVector => BDV }
+import breeze.linalg.{ DenseVector => BDV, Vector => BV}
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -128,15 +131,14 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
     val initTimeInSeconds = (System.nanoTime() - initStartTime) / 1e9
 
+    val dim = data.first().vector.size
 
-
-    var activeRuns = new ArrayBuffer[Int] ++ (0 until numRuns)
     var iteration = 0
     val iterationStartTime = System.nanoTime()
     var converged = false
 
     // Implementation of Fuzzy C-Means algorithm:
-    while(iteration < maxIterations && !activeRuns.isEmpty && converged == false) {
+    while(iteration < maxIterations && converged == false) {
 
       // broadcast the centers to all the machines
       val broadcasted_centers = sc.broadcast(centers)
@@ -156,10 +158,15 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
         * An array thet represemts the distance the data_point (x_i) from from each cluster
         * actual_cluster_to_point_distance [j] = (||x_i - c_j ||) ^ (2/(m-1))
         */
-        val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
+//        val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
+        val actual_cluster_to_point_distance = Array.fill(clustersNum)(BDV.zeros[Double](dim)
+                                                                      .asInstanceOf[BV[Double]])
+//        val actual_cluster_to_point_distance = Array.fill[VectorWithNorm](clustersNum)()
 
         val partial_num = Array.fill[Double](clustersNum)(0)
         val partialDen = Array.fill[Double](clustersNum)(0)
+        val numDist = Array.fill[Double](clustersNum)(0)
+
         data_ponts.foreach { data_point =>
           /**
           * total_distance represents for each data_point the total distance from clusters:
@@ -173,12 +180,13 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
             // the distance of data_point from cluster j:
 
             // Alex: is this corrent???
-            val cluster_to_point_distance = KMeans.fastSquaredDistance(broadcasted_centers.value(j) , data_point)
-            actual_cluster_to_point_distance(j) = math.pow(cluster_to_point_distance,
-              (2/( fuzzynessCoefficient - 1)))
+
+            val cluster_to_point_distance =
+                        KMeans.fastSquaredDistance(broadcasted_centers.value(j), data_point)
+            numDist(j) = math.pow(cluster_to_point_distance, (2/( fuzzynessCoefficient - 1)))
 
             // update the total_distance:
-            total_distance += (1 / actual_cluster_to_point_distance(j))
+            total_distance += (1 / numDist(j))
           }
 
           // calculation of the new values of the membership matrix:
@@ -189,20 +197,22 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
             * this is the calculation of (u_ij)^m:
             */
 
-            val u_i_j_m = math.pow(actual_cluster_to_point_distance(j) * total_distance, -fuzzynessCoefficient)
+            val u_i_j_m: Double = math.pow(numDist(j) * total_distance, -fuzzynessCoefficient)
 
-            partial_num(j) += (data_point.vector(0) * u_i_j_m) // local num of c(j) formula
-
+            var dense_vec1: BDV[Double] = new BDV(data_point.vector.toArray)
+            dense_vec1 *= u_i_j_m
+            actual_cluster_to_point_distance(j) += dense_vec1 // local num of c(j) formula
             partialDen(j) += u_i_j_m // local den of c(j) formula
           }
         }
+
+
 
         val centerContribs = for (j <- 0 until clustersNum) yield {
           (j, (partial_num(j), partialDen(j)))
         }
         centerContribs.iterator
 
-//      }.collectAsMap()
       }.reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).collectAsMap()
 
 
@@ -217,6 +227,9 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
         if (totContr(j)._2 != 0) {
           // create a new center:
+
+          var temp: Double = totContr(j)._1 / totContr(j)._2
+          //          val newCenter = new VectorWithNorm(totContr(j)._1 / totContr(j)._2)
           val newCenter = centers(j)
 
           if (KMeans.fastSquaredDistance(newCenter, centers(j)) > epsilon * epsilon) {
