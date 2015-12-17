@@ -33,7 +33,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.Row
 /**
-  * Created by development on 28/11/15.
+  * A clustering model for Fuzzy C - Means
   */
 class FuzzyCMeansModel @Since("1.1.0") (@Since("1.0.0") val clusterCenters: Array[Vector])
   extends Saveable with Serializable with PMMLExportable {
@@ -45,8 +45,17 @@ class FuzzyCMeansModel @Since("1.1.0") (@Since("1.0.0") val clusterCenters: Arra
     // FuzzyCMeansModel.SaveLoadV1_0.save(sc, this, path)
   }
   /**
-    * A Java-friendly constructor that takes an Iterable of Vectors.
-    */
+   * A Java-friendly constructor that takes an Iterable of Vectors.
+   */
   @Since("1.4.0")
   def this(centers: java.lang.Iterable[Vector]) = this(centers.asScala.toArray)
+
+  /**
+   * Total number of clusters.
+   */
+  def c: Int = clusterCenters.length
+
+  def centers(): Array[Vector] = {
+    clusterCenters
+  }
 }

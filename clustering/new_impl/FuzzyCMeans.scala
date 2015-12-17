@@ -207,7 +207,6 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
         }
 
 
-
         val centerContribs = for (j <- 0 until clustersNum) yield {
           (j, (actual_cluster_to_point_distance(j), partialDen(j)))
         }
@@ -285,9 +284,24 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
 }
 
-
+/**
+  * Top-level methods for calling K-means clustering.
+  */
 object FuzzyCMeans {
 
+  /**
+   * Trains a Fuzzy C - Means model using the given set of parameters.
+   *
+   * @param data training points stored as `RDD[Vector]`
+   * @param clusterNum number of clusters
+   * @param fuzzynessCoefficient measures the tolerance of the required clustering.
+   *                             This value determines how much the clusters can overlap with one another.
+   *                             The higher the value of m, the larger the overlap between clusters.
+   *                             (must be greater than 1)
+   * @param maxIterations max number of iterations
+   * @param epsilon termination criterion (between 0 and 1)
+
+   */
   def train(
       data: RDD[Vector],
       clusterNum: Int,
