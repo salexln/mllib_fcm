@@ -32,9 +32,13 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.Row
+
+
+
 /**
-  * A clustering model for Fuzzy C - Means
-  */
+ * A clustering model for Fuzzy C - Means
+ * @param clusterCenters centers of the clusters
+ */
 class FuzzyCMeansModel @Since("1.1.0") (@Since("1.0.0") val clusterCenters: Array[Vector])
   extends Saveable with Serializable with PMMLExportable {
 
@@ -42,27 +46,32 @@ class FuzzyCMeansModel @Since("1.1.0") (@Since("1.0.0") val clusterCenters: Arra
   override protected def formatVersion: String = "1.0"
 
   override def save(sc: SparkContext, path: String): Unit = {
-    // FuzzyCMeansModel.SaveLoadV1_0.save(sc, this, path)
+     FuzzyCMeansModel.SaveLoadV1_0.save(sc, this, path)
   }
   /**
    * A Java-friendly constructor that takes an Iterable of Vectors.
    */
-  @Since("1.4.0")
+//  @Since("1.4.0")
   def this(centers: java.lang.Iterable[Vector]) = this(centers.asScala.toArray)
 
   /**
-   * Total number of clusters.
+   *
+   * @return Total number of clusters.
    */
   def clusterCentersNum() : Int = clusterCenters.length
 
+  /**
+   *
+   * @return The cluster centers
+   */
   def centers(): Array[Vector] = {
     clusterCenters
   }
 
   /**
    *
-   * @param data_point the data point you want to get the membership vector for
-   * @return the membership vector for the input point: defines the membership
+   * @param data_point The data point you want to get the membership vector for
+   * @return Membership vector for the input point: defines the membership
    *         of the input point to each cluster
    */
   def getMembershipForPoint(data_point: VectorWithNorm): Array[Double] = {
@@ -91,4 +100,75 @@ class FuzzyCMeansModel @Since("1.1.0") (@Since("1.0.0") val clusterCenters: Arra
     }
     ui
   }
+
+  /**
+   *
+   * @param data_point The data point you want to get the highest associated center for
+   * @return The index of the most associated center
+   */
+  def findMostAssociatedCenter(data_point: VectorWithNorm) : Int = {
+    val u_i = getMembershipForPoint(data_point)
+
+    // find the max value in the u_i array:
+    u_i.indexOf(u_i.max)
+  }
 }
+
+
+
+object FuzzyCMeansModel  extends Loader[FuzzyCMeansModel] {
+
+  override def load(sc: SparkContext, path: String): FuzzyCMeansModel = {
+    FuzzyCMeansModel.SaveLoadV1_0.load(sc, path)
+  }
+
+  private case class Cluster(id: Int, point: Vector)
+
+  private object Cluster {
+    def apply(r: Row): Cluster = {
+      Cluster(r.getInt(0), r.getAs[Vector](1))
+    }
+  }
+
+  private[clustering]
+  object SaveLoadV1_0 {
+
+    private val thisFormatVersion = "1.0"
+
+    private[clustering]
+    val thisClassName = "org.apache.spark.mllib.clustering.FuzzyCMeansModel"
+
+    def save(sc: SparkContext, model: FuzzyCMeansModel, path: String): Unit = {
+      val sqlContext = new SQLContext(sc)
+      import sqlContext.implicits._
+      val metadata = compact(render(
+        ("class" -> thisClassName) ~ ("version" -> thisFormatVersion)
+                                   ~ ("c" -> model.clusterCentersNum() )))
+      sc.parallelize(Seq(metadata), 1).saveAsTextFile(Loader.metadataPath(path))
+      val dataRDD = sc.parallelize(model.clusterCenters.zipWithIndex).map { case (point, id) =>
+        Cluster(id, point)
+      }.toDF()
+      dataRDD.write.parquet(Loader.dataPath(path))
+    }
+
+    def load(sc: SparkContext, path: String): FuzzyCMeansModel = {
+      implicit val formats = DefaultFormats
+      val sqlContext = new SQLContext(sc)
+      val (className, formatVersion, metadata) = Loader.loadMetadata(sc, path)
+      assert(className == thisClassName)
+      assert(formatVersion == thisFormatVersion)
+      val c = (metadata \ "c").extract[Int]
+      val centroids = sqlContext.read.parquet(Loader.dataPath(path))
+      Loader.checkSchema[Cluster](centroids.schema)
+      val localCentroids = centroids.map(Cluster.apply).collect()
+      assert(c == localCentroids.size)
+      new FuzzyCMeansModel(localCentroids.sortBy(_.id).map(_.point))
+    }
+  }
+}
+
+
+
+
+
+
