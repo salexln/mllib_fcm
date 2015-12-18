@@ -198,7 +198,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 //        */
 
         /**
-        * An array thet represemts the distance the data_point (x_i) from from each cluster
+        * An array thet represents the distance the data_point (x_i) from from each cluster
         * actual_cluster_to_point_distance [j] = (||x_i - c_j ||) ^ (2/(m-1))
         */
 //        val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
