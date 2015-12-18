@@ -74,7 +74,7 @@ class FuzzyCMeansModel @Since("1.1.0") (@Since("1.0.0") val clusterCenters: Arra
    * @return Membership vector for the input point: defines the membership
    *         of the input point to each cluster
    */
-  def getMembershipForPoint(data_point: VectorWithNorm): Array[Double] = {
+  def getMembershipVector(data_point: VectorWithNorm): Array[Double] = {
     val ui = Array.fill[Double](clusterCentersNum())(0)
     val clusterCenters = centers()
     val distance_from_centerArr = Array.fill[Double](clusterCentersNum())(0)
@@ -107,7 +107,7 @@ class FuzzyCMeansModel @Since("1.1.0") (@Since("1.0.0") val clusterCenters: Arra
    * @return The index of the most associated center
    */
   def findMostAssociatedCenter(data_point: VectorWithNorm) : Int = {
-    val u_i = getMembershipForPoint(data_point)
+    val u_i = getMembershipVector(data_point)
 
     // find the max value in the u_i array:
     u_i.indexOf(u_i.max)

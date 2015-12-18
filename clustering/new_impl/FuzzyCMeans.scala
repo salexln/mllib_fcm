@@ -53,13 +53,13 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
   def this() = this(2, 20, 1e-4, 2)
 
   /**
-   *
+   * Returns the number of clusters
    * @return Cluster number
    */
   def getClustersNum: Int = this.clustersNum
 
   /**
-   *
+   * Sets number of the clusters
    * @param clustersNum Sets number of the wanted clusters
    * @return
    */
@@ -72,13 +72,13 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
   }
 
   /**
-   *
+   * Returns the number of the maximum iterations
    * @return Max iterations for the algorithm
    */
   def getMaxIterations: Int = this.maxIterations
 
   /**
-   *
+   * Sets the max interations
    * @param maxIter set max number of iterations for the algorithm
    * @return
    */
@@ -91,13 +91,13 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
   }
 
   /**
-   *
+   * Returns the termination criterion
    * @return Termination criterion
    */
   def getEpsilon: Double = this.epsilon
 
   /**
-   *
+   * Sets the termination criterion
    * @param epsilon sets termination criterion for the algorithm
    * @return
    */
@@ -110,13 +110,13 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
   }
 
   /**
-   *
+   * Returns the fuzzyness coefficient
    * @return Fuzzyness coefficient
    */
   def getFuzzynessCoefficient: Double = this.fuzzynessCoefficient
 
   /**
-   *
+   * Sets the fuzzyness coefficient
    * @param coeficient Sets the fuzzyness coefficient
    * @return
    */
