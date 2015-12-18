@@ -1,4 +1,3 @@
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,7 +17,7 @@
 
 package org.apache.spark.mllib.clustering
 
-//import org.apache.spark.mllib.linalg.{ Vector => Alex }
+// import org.apache.spark.mllib.linalg.{ Vector => Alex }
 import org.apache.spark.Logging
 import org.apache.spark.mllib.linalg.BLAS._
 import org.apache.spark.util.random.XORShiftRandom
@@ -199,7 +198,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
         /**
         * An array thet represents the distance the data_point (x_i) from from each cluster
-        * actual_cluster_to_point_distance [j] = (||x_i - c_j ||) ^ (2/(m-1))
+        * actual_cluster_to_point_distance [j] = (||x_i - c_j ||) ^^ (2/(m-1))
         */
 //        val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
         val actual_cluster_to_point_distance = Array.fill(clustersNum)(BDV.zeros[Double](data_dim )
@@ -214,7 +213,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
           /**
           * total_distance represents for each data_point the total distance from clusters:
           *
-          *      total_distance = SUM_j 1 / ( (||data_point - c_j||)^(2/ (m-1) ) )
+          *      total_distance = SUM_j 1 / ( (||data_point - c_j||)^^(2/ (m-1) ) )
           */
           val temp: VectorWithNorm = data_point
           var total_distance = 0.0
