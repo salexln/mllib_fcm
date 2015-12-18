@@ -53,9 +53,42 @@ class FuzzyCMeansModel @Since("1.1.0") (@Since("1.0.0") val clusterCenters: Arra
   /**
    * Total number of clusters.
    */
-  def c: Int = clusterCenters.length
+  def clusterCentersNum() : Int = clusterCenters.length
 
   def centers(): Array[Vector] = {
     clusterCenters
+  }
+
+  /**
+   *
+   * @param data_point the data point you want to get the membership vector for
+   * @return the membership vector for the input point: defines the membership
+   *         of the input point to each cluster
+   */
+  def getMembershipForPoint(data_point: VectorWithNorm): Array[Double] = {
+    val ui = Array.fill[Double](clusterCentersNum())(0)
+    val clusterCenters = centers()
+    val distance_from_centerArr = Array.fill[Double](clusterCentersNum())(0)
+
+
+    // compute distances:
+    var total_distance = 0.0
+    for (j <- 0 until clusterCentersNum()) {
+      val center_with_norm = new VectorWithNorm(clusterCenters(j))
+      val distance_from_center = KMeans.fastSquaredDistance(center_with_norm, data_point)
+      val temp = math.pow(distance_from_center,
+                                2/( FuzzyCMeans.getFuzzynessCoefficient - 1))
+
+      distance_from_centerArr(j) = temp
+      total_distance += (1 / distance_from_centerArr(j))
+    }
+
+    // compute the u_i_j:
+    for (j <- 0 until clusterCentersNum()) {
+      val u_i_j_m: Double = math.pow(distance_from_centerArr(j) * total_distance,
+        -FuzzyCMeans.getFuzzynessCoefficient)
+      ui(j) = u_i_j_m
+    }
+    ui
   }
 }

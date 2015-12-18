@@ -173,6 +173,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
           *
           *      total_distance = SUM_j 1 / ( (||data_point - c_j||)^(2/ (m-1) ) )
           */
+          val temp: VectorWithNorm = data_point
           var total_distance = 0.0
 
           // computation of the distance of data_point from each cluster:
@@ -314,4 +315,7 @@ object FuzzyCMeans {
       .setEplison(epsilon)
       .run(data)
   }
+
+  def getFuzzynessCoefficient: Double = FuzzyCMeans.getFuzzynessCoefficient
+
 }
