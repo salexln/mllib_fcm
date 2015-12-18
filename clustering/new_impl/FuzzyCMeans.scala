@@ -32,22 +32,37 @@ import breeze.linalg.{ DenseVector => BDV, Vector => BV}
 import scala.collection.mutable.ArrayBuffer
 
 
-
+/**
+ *
+ * @param clustersNum The wanted number of clusters
+ * @param maxIterations Maximux iterations for the algorithm
+ * @param epsilon Termination criterion
+ * @param fuzzynessCoefficient Measures the tolerance of the required clustering.
+ *                             This value determines how much the clusters can overlap with one
+ *                             another. The higher the value of m, the larger the overlap
+ *                             between clusters.
+ */
 class FuzzyCKMeans private ( private var clustersNum: Int,
                              private var maxIterations: Int,
-                             private var runs: Int,
                              // private var initializationMode: String,
-                             // private var initializationSteps: Int,
                              private var epsilon: Double,
                              private var fuzzynessCoefficient: Double )
 // private var seed: Long)
   extends Serializable with Logging {
 
-  // def this() = this(2, 20, 1, KMeans.K_MEANS_PARALLEL, 5, 1e-4, Utils.random.nextLong())
-  def this() = this(2, 20, 1, 1e-4, 2)
+  def this() = this(2, 20, 1e-4, 2)
 
+  /**
+   *
+   * @return Cluster number
+   */
   def getClustersNum: Int = this.clustersNum
 
+  /**
+   *
+   * @param clustersNum Sets number of the wanted clusters
+   * @return
+   */
   def setClustersNum(clustersNum: Int): this.type = {
     if (clustersNum <= 0) {
       throw new IllegalArgumentException("Number of clusters must be positive")
@@ -56,8 +71,17 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     this
   }
 
+  /**
+   *
+   * @return Max iterations for the algorithm
+   */
   def getMaxIterations: Int = this.maxIterations
 
+  /**
+   *
+   * @param maxIter set max number of iterations for the algorithm
+   * @return
+   */
   def setMaxIterations(maxIter : Int): this.type = {
     if (maxIter <= 0) {
       throw new IllegalArgumentException("Number of max iterations must be positive")
@@ -66,8 +90,17 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     this
   }
 
+  /**
+   *
+   * @return Termination criterion
+   */
   def getEpsilon: Double = this.epsilon
 
+  /**
+   *
+   * @param epsilon sets termination criterion for the algorithm
+   * @return
+   */
   def setEplison(epsilon: Double): this.type = {
     if (epsilon < 0 || epsilon > 1) {
       throw new IllegalArgumentException("Epsilon value must be between 0 and 1")
@@ -76,15 +109,17 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     this
   }
 
-  def getRuns: Double = this.runs
-
-  def setRuns(runs: Int): this.type = {
-    this.runs = runs
-    this
-  }
-
+  /**
+   *
+   * @return Fuzzyness coefficient
+   */
   def getFuzzynessCoefficient: Double = this.fuzzynessCoefficient
 
+  /**
+   *
+   * @param coeficient Sets the fuzzyness coefficient
+   * @return
+   */
   def setFuzzynessCoefficient(coeficient: Double): this.type = {
     if (coeficient < 0) {
       throw new IllegalArgumentException("Fuzzyness coefficient must be bigger than 1")
@@ -93,6 +128,11 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     this
   }
 
+  /**
+   * Train a Fuzzy C - Means model on the given set of points;
+   * @param data Input data to the algorithm
+   * @return FuzzyCMeansModel with the results of the run
+   */
   def run(data: RDD[Vector]): FuzzyCMeansModel = {
 
     if (data.getStorageLevel == StorageLevel.NONE) {
@@ -117,27 +157,30 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     model
   }
 
+  /**
+   * Implementation of the Fuzzy C - Means algorithm
+   * @param data input data to the algorithm
+   * @return FuzzyCMeansModel with the results of the run
+   */
   private def runAlgorithm(data: RDD[VectorWithNorm]): FuzzyCMeansModel = {
 
     val sc = data.sparkContext
     val initStartTime = System.nanoTime()
 
-    val numRuns = runs
-
-    /**
-    * Randomly initialize C clusters
-    */
+    // random initializations of the centers
     val centers = initRandomCenters(data)
 
     val initTimeInSeconds = (System.nanoTime() - initStartTime) / 1e9
+    logInfo(s"Initialization with took " + "%.3f".format(initTimeInSeconds) +
+      " seconds.")
 
-    val dim = data.first().vector.size
+    val data_dim = data.first().vector.size
 
     var iteration = 0
     val iterationStartTime = System.nanoTime()
     var converged = false
 
-    // Implementation of Fuzzy C-Means algorithm:
+    // Algorithm should stop if it is converged or it exceeded the max iterations
     while(iteration < maxIterations && converged == false) {
 
       // broadcast the centers to all the machines
@@ -159,7 +202,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
         * actual_cluster_to_point_distance [j] = (||x_i - c_j ||) ^ (2/(m-1))
         */
 //        val actual_cluster_to_point_distance = Array.fill[Double](clustersNum)(0)
-        val actual_cluster_to_point_distance = Array.fill(clustersNum)(BDV.zeros[Double](dim)
+        val actual_cluster_to_point_distance = Array.fill(clustersNum)(BDV.zeros[Double](data_dim )
                                                                       .asInstanceOf[BV[Double]])
 //        val actual_cluster_to_point_distance = Array.fill[VectorWithNorm](clustersNum)()
 
@@ -259,26 +302,17 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
       logInfo(s"Fuzzy C-Means converged in $iteration iterations.")
     }
 
-    // Alex: we do not need this!!
     new FuzzyCMeansModel(centers.map(_.vector))
   }
 
-//  private def initRandomCenters(data: RDD[VectorWithNorm])
-//  : Array[Array[VectorWithNorm]] = {
-//    // Sample all the cluster centers in one pass to avoid repeated scans
-//
-//    // create a random seed (maybe should be an input like in KMeans??
-//    val sample = data.takeSample(true, runs * clustersNum, new XORShiftRandom().nextInt()).toSeq
-//    Array.tabulate(runs)(r => sample.slice(r * clustersNum, (r + 1) * clustersNum).map { v =>
-//      new VectorWithNorm(Vectors.dense(v.vector.toArray), v.norm)
-//    }.toArray)
-//  }
-
+  /**
+   * Inits random centers
+   * @param data input data
+   * @return Array of random centers
+   */
   private def initRandomCenters(data: RDD[VectorWithNorm])
   : Array[VectorWithNorm] = {
-    // Sample all the cluster centers in one pass to avoid repeated scans
-
-    // create a random seed (maybe should be an input like in KMeans??
+    // create a random seed
     val sample = data.takeSample(true, clustersNum, new XORShiftRandom().nextInt())
     sample
   }
@@ -296,9 +330,9 @@ object FuzzyCMeans {
    * @param data training points stored as `RDD[Vector]`
    * @param clusterNum number of clusters
    * @param fuzzynessCoefficient measures the tolerance of the required clustering.
-   *                             This value determines how much the clusters can overlap with one another.
-   *                             The higher the value of m, the larger the overlap between clusters.
-   *                             (must be greater than 1)
+   *                             This value determines how much the clusters can overlap with one
+   *                             another. The higher the value of m, the larger the overlap
+   *                             between clusters.(must be greater than 1)
    * @param maxIterations max number of iterations
    * @param epsilon termination criterion (between 0 and 1)
 
