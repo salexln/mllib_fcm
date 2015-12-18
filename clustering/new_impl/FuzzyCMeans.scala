@@ -181,9 +181,9 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
       val broadcasted_centers = sc.broadcast(centers)
 
       /**
-      * Recalculate the centroid of each cluster using:
-      *             FOR j = 0: j < clustersNum:
-      *                 c_j = (SUM_i (u_i_j * x_i) ) / (SUM_i(u_i_j))
+      * Recalculate the current cluster centers:
+      *         FOR j = 0: j < clustersNum:
+      *             c_j = (SUM_i (u_i_j * x_i) ) / (SUM_i(u_i_j))
       */
       val totContr = data.mapPartitions { data_ponts =>
 //        /**
@@ -256,34 +256,28 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
      // Update centers:
       var center_changed = false
       for (j <- 0 until clustersNum) {
-        // create new center:
-
-//        var new_center = new VectorWithNorm(Vectors.dense(v.vector.toArray), v.norm)
-//        var new_center = new VectorWithNorm((Vectors.dense(totContr(j).toArray)))
-
         if (totContr(j)._2 != 0) {
-          // create a new center:
+
+          // create new center:
           var dense_vec1: BDV[Double] = new BDV(totContr(j)._1.toArray)
           dense_vec1 /= totContr(j)._2
-
           val newCenter = new VectorWithNorm(dense_vec1.toArray)
 
           if (KMeans.fastSquaredDistance(newCenter, centers(j)) > epsilon * epsilon) {
+            // in case the distance is greater than epsilon^2 we should replace the center
             center_changed = true
           }
           centers(j) = newCenter
         }
       }
 
-
       if(!center_changed) {
-        // this means that no change was made the we can stop
+        // no change was made the we can stop
         converged = true
         logInfo("Run finished in " + (iteration + 1) + " iterations")
       } else {
         iteration += 1
       }
-
     }
 
     val iterationTimeInSeconds = (System.nanoTime() - iterationStartTime) / 1e9
@@ -303,9 +297,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
    * @param data input data
    * @return Array of random centers
    */
-  private def initRandomCenters(data: RDD[VectorWithNorm])
-  : Array[VectorWithNorm] = {
-    // create a random seed
+  private def initRandomCenters(data: RDD[VectorWithNorm]): Array[VectorWithNorm] = {
     val sample = data.takeSample(true, clustersNum, new XORShiftRandom().nextInt())
     sample
   }
