@@ -17,18 +17,13 @@
 
 package org.apache.spark.mllib.clustering
 
-// import org.apache.spark.mllib.linalg.{ Vector => Alex }
-import org.apache.spark.Logging
-import org.apache.spark.mllib.linalg.BLAS._
-import org.apache.spark.util.random.XORShiftRandom
 
-// import org.apache.spark.mllib.clustering.KMeansModel
-import org.apache.spark.mllib.linalg.{DenseVector, Vectors, Vector}
+import org.apache.spark.Logging
+import org.apache.spark.util.random.XORShiftRandom
+import org.apache.spark.mllib.linalg.{Vectors, Vector}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import breeze.linalg.{ DenseVector => BDV }
 import breeze.linalg.{ DenseVector => BDV, Vector => BV}
-import scala.collection.mutable.ArrayBuffer
 
 
 /**
@@ -180,7 +175,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
     var converged = false
 
     // Algorithm should stop if it is converged or it exceeded the max iterations
-    while(iteration < maxIterations && converged == false) {
+    while(iteration < maxIterations && !converged) {
 
       // broadcast the centers to all the machines
       val broadcasted_centers = sc.broadcast(centers)
@@ -215,7 +210,6 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
           *
           *      total_distance = SUM_j 1 / ( (||data_point - c_j||)^^(2/ (m-1) ) )
           */
-          val temp: VectorWithNorm = data_point
           var total_distance = 0.0
 
           // computation of the distance of data_point from each cluster:
@@ -226,7 +220,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
 
             val cluster_to_point_distance =
                         KMeans.fastSquaredDistance(broadcasted_centers.value(j), data_point)
-            numDist(j) = math.pow(cluster_to_point_distance, (2/( fuzzynessCoefficient - 1)))
+            numDist(j) = math.pow(cluster_to_point_distance, 2/( fuzzynessCoefficient - 1))
 
             // update the total_distance:
             total_distance += (1 / numDist(j))
@@ -282,7 +276,7 @@ class FuzzyCKMeans private ( private var clustersNum: Int,
       }
 
 
-      if(center_changed == false) {
+      if(!center_changed) {
         // this means that no change was made the we can stop
         converged = true
         logInfo("Run finished in " + (iteration + 1) + " iterations")
